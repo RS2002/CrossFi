@@ -132,33 +132,6 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
     dann.eval()
     torch.set_grad_enabled(False)
 
-    # generate template
-    # template = torch.zeros([class_num, hidden_dim]).to(device)
-    # template_weights = torch.zeros([class_num, 1]).to(device)
-    # dataloader_iterator = iter(train_loader)
-    # x_false, label_false, _ = next(dataloader_iterator)
-    # for j in range(2):
-    #     x_train, action_train, people_train = next(dataloader_iterator)
-    #     x_train = x_train.to(device)
-    #     if task == "action":
-    #         label = action_train.to(device)
-    #     elif task == "people":
-    #         label = people_train.to(device)
-    #     else:
-    #         print("ERROR")
-    #         exit(-1)
-    #     y_train = model(x_train)
-    #     score = attn_model(y_train, y_train)
-    #     score = score.unsqueeze(0)
-    #     score = score.unsqueeze(0)
-    #     weight = weight_model(score)
-    #     weight = weight.squeeze()
-    #     weight = F.sigmoid(weight)
-    #     num = y_train.shape[0]
-    #     for i in range(num):
-    #         template[label[i]] += y_train[i] * weight[i]
-    #         template_weights[label[i]] += weight[i]
-    # template = template / template_weights
 
     template=torch.zeros([class_num,hidden_dim]).to(device)
     num=0
@@ -180,6 +153,32 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
                 break
         if num==class_num:
             break
+
+    # template = torch.zeros([class_num, hidden_dim]).to(device)
+    # template_weights = torch.zeros([class_num, 1]).to(device)
+    # dataloader_iterator = iter(train_loader)
+    # for j in range(2):
+    #     x_train, action_train, people_train = next(dataloader_iterator)
+    #     x_train = x_train.to(device)
+    #     if task == "action":
+    #         label = action_train.to(device)
+    #     elif task == "people":
+    #         label = people_train.to(device)
+    #     else:
+    #         print("ERROR")
+    #         exit(-1)
+    #     y_train = model(x_train)
+    #     score = attn_model(y_train, y_train)
+    #     score = score.unsqueeze(0)
+    #     score = score.unsqueeze(0)
+    #     weight = weight_model(score)
+    #     weight = weight.squeeze()
+    #     weight = F.sigmoid(weight)
+    #     num = y_train.shape[0]
+    #     for i in range(num):
+    #         if weight[i]>template_weights[label[i]]:
+    #             template_weights[label[i]]=weight[i]
+    #             template[label[i]]=y_train[i]
 
     if not train:
         # find the most similar sample as new template

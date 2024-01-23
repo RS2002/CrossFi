@@ -143,7 +143,6 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
         template=torch.zeros([class_num,hidden_dim]).to(device)
         template_weights=torch.zeros([class_num,1]).to(device)
         dataloader_iterator = iter(train_loader)
-        x_false, label_false, _ = next(dataloader_iterator)
         for j in range(2):
             x_train, action_train, people_train = next(dataloader_iterator)
             x_train = x_train.to(device)
