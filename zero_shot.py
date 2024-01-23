@@ -9,6 +9,7 @@ import numpy as np
 import torch.nn.functional as F
 import math
 import copy
+from func import mk_mmd_loss
 
 domain_weight=1
 
@@ -72,17 +73,18 @@ def pre_train(model, attn_model, dann, data_loader, domain_loader, loss_func, lo
 
         if train:
             if MMD:
-                y_hat_mean = torch.mean(y_hat, dim=0, keepdim=True)
-                y_hat = torch.mean(y_hat * y_hat_mean, dim=0, keepdim=True)
+                # y_hat_mean = torch.mean(y_hat, dim=0, keepdim=True)
+                # y_hat = y_hat_mean
 
                 dataloader_iterator = iter(domain_loader)
                 x_target, _, _ = next(dataloader_iterator)
                 x_target=x_target.to(device)
                 y_target = model(x_target)
-                y_hat_target_mean = torch.mean(y_target, dim=0, keepdim=True)
-                y_hat_target = torch.mean(y_target * y_hat_target_mean, dim=0, keepdim=True)
+                # y_hat_target_mean = torch.mean(y_target, dim=0, keepdim=True)
+                # y_hat_target = y_hat_target_mean
 
-                loss_mmd = torch.mean(loss_func(y_hat_target, y_hat))
+                # loss_mmd = torch.mean(loss_func(y_hat_target, y_hat))
+                loss_mmd=mk_mmd_loss(y_target,y_hat)
                 loss += domain_weight * loss_mmd
 
             if adversarial:
@@ -131,38 +133,36 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
     torch.set_grad_enabled(False)
 
     # generate template
-    template = torch.zeros([class_num, hidden_dim]).to(device)
-    template_weights = torch.zeros([class_num, 1]).to(device)
-    dataloader_iterator = iter(train_loader)
-    x_false, label_false, _ = next(dataloader_iterator)
-    for j in range(2):
-        x_train, action_train, people_train = next(dataloader_iterator)
-        x_train = x_train.to(device)
-        if task == "action":
-            label = action_train.to(device)
-        elif task == "people":
-            label = people_train.to(device)
-        else:
-            print("ERROR")
-            exit(-1)
-        y_train = model(x_train)
-        score = attn_model(y_train, y_train)
-        score = score.unsqueeze(0)
-        score = score.unsqueeze(0)
-        weight = weight_model(score)
-        weight = weight.squeeze()
-        weight = F.sigmoid(weight)
-        num = y_train.shape[0]
-        for i in range(num):
-            template[label[i]] += y_train[i] * weight[i]
-            template_weights[label[i]] += weight[i]
-    template = template / template_weights
+    # template = torch.zeros([class_num, hidden_dim]).to(device)
+    # template_weights = torch.zeros([class_num, 1]).to(device)
+    # dataloader_iterator = iter(train_loader)
+    # x_false, label_false, _ = next(dataloader_iterator)
+    # for j in range(2):
+    #     x_train, action_train, people_train = next(dataloader_iterator)
+    #     x_train = x_train.to(device)
+    #     if task == "action":
+    #         label = action_train.to(device)
+    #     elif task == "people":
+    #         label = people_train.to(device)
+    #     else:
+    #         print("ERROR")
+    #         exit(-1)
+    #     y_train = model(x_train)
+    #     score = attn_model(y_train, y_train)
+    #     score = score.unsqueeze(0)
+    #     score = score.unsqueeze(0)
+    #     weight = weight_model(score)
+    #     weight = weight.squeeze()
+    #     weight = F.sigmoid(weight)
+    #     num = y_train.shape[0]
+    #     for i in range(num):
+    #         template[label[i]] += y_train[i] * weight[i]
+    #         template_weights[label[i]] += weight[i]
+    # template = template / template_weights
 
-    # find the most similar sample as new template
-    new_template = copy.deepcopy(template).to(device)
-    template_sim = torch.zeros([class_num]).to(device)
-    template_label = torch.zeros([class_num]).to(device) - 1
-    for x, action, people in data_loader:
+    template=torch.zeros([class_num,hidden_dim]).to(device)
+    num=0
+    for x,action,people in train_loader:
         x = x.to(device)
         if task == "action":
             label = action.to(device)
@@ -172,17 +172,45 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
             print("ERROR")
             exit(-1)
         y = model(x)
-        score = attn_model(y, template)
-        output = torch.argmax(score, dim=-1).int()
-        for i in range(y.shape[0]):
-            if score[i, output[i]] > template_sim[output[i]]:
-                if train and label[i] != output[i]:
-                    continue
-                template_sim[output[i]] = score[i, output[i]]
-                new_template[output[i]] = y[i]
-                template_label[output[i]] = label[i]
-    # print(template_label)
-    template = new_template
+        for i in range(x.shape[0]):
+            if torch.sum(template[label[i]])==0:
+                template[label[i]]=y[i]
+                num+=1
+            if num==class_num:
+                break
+        if num==class_num:
+            break
+
+    if not train:
+        # find the most similar sample as new template
+        new_template = copy.deepcopy(template).to(device)
+        template_sim = torch.zeros([class_num]).to(device)
+        template_label = torch.zeros([class_num]).to(device) - 1
+        j=0
+        for x, action, people in data_loader:
+            j+=1
+            x = x.to(device)
+            if task == "action":
+                label = action.to(device)
+            elif task == "people":
+                label = people.to(device)
+            else:
+                print("ERROR")
+                exit(-1)
+            y = model(x)
+            score = attn_model(y, template)
+            output = torch.argmax(score, dim=-1).int()
+            for i in range(y.shape[0]):
+                if score[i, output[i]] > template_sim[output[i]]:
+                    if train and label[i] != output[i]:
+                        continue
+                    template_sim[output[i]] = score[i, output[i]]
+                    new_template[output[i]] = y[i]
+                    template_label[output[i]] = label[i]
+            if j>=3:
+                break
+        # print(template_label)
+        template = new_template
 
     if train:
         model.train()
@@ -221,17 +249,18 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
 
         if train:
             if MMD:
-                y_hat_mean = torch.mean(y_hat, dim=0, keepdim=True)
-                y_hat = torch.mean(y_hat * y_hat_mean, dim=0, keepdim=True)
+                # y_hat_mean = torch.mean(y_hat, dim=0, keepdim=True)
+                # y_hat = y_hat_mean
 
                 dataloader_iterator = iter(domain_loader)
                 x_target, _, _ = next(dataloader_iterator)
                 x_target=x_target.to(device)
                 y_target = model(x_target)
-                y_hat_target_mean = torch.mean(y_target, dim=0, keepdim=True)
-                y_hat_target = torch.mean(y_target * y_hat_target_mean, dim=0, keepdim=True)
+                # y_hat_target_mean = torch.mean(y_target, dim=0, keepdim=True)
+                # y_hat_target = y_hat_target_mean
 
-                loss_mmd = torch.mean(loss_func(y_hat_target, y_hat))
+                # loss_mmd = torch.mean(loss_func(y_hat_target, y_hat))
+                loss_mmd=mk_mmd_loss(y_target,y_hat)
                 loss += domain_weight * loss_mmd
 
             if adversarial:

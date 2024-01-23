@@ -8,6 +8,7 @@ import tqdm
 import numpy as np
 import torch.nn.functional as F
 import math
+from func import mk_mmd_loss
 
 domain_weight=1
 
@@ -71,18 +72,19 @@ def pre_train(model, attn_model, dann, data_loader, domain_loader, loss_func, lo
 
         if train:
             if MMD:
-                y_hat_mean=torch.mean(y_hat, dim=0, keepdim=True)
-                y_hat=torch.mean(y_hat*y_hat_mean, dim=0, keepdim=True)
+                # y_hat_mean = torch.mean(y_hat, dim=0, keepdim=True)
+                # y_hat = y_hat_mean
 
                 dataloader_iterator = iter(domain_loader)
                 x_target, _, _ = next(dataloader_iterator)
                 x_target=x_target.to(device)
-                y_target=model(x_target)
-                y_hat_target_mean=torch.mean(y_target, dim=0, keepdim=True)
-                y_hat_target=torch.mean(y_target*y_hat_target_mean, dim=0, keepdim=True)
+                y_target = model(x_target)
+                # y_hat_target_mean = torch.mean(y_target, dim=0, keepdim=True)
+                # y_hat_target = y_hat_target_mean
 
-                loss_mmd = torch.mean(loss_func(y_hat_target, y_hat))
-                loss+=domain_weight*loss_mmd
+                # loss_mmd = torch.mean(loss_func(y_hat_target, y_hat))
+                loss_mmd=mk_mmd_loss(y_target,y_hat)
+                loss += domain_weight * loss_mmd
 
             if adversarial:
                 truth = torch.ones_like(label).to(device)
@@ -189,17 +191,18 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
 
         if train:
             if MMD:
-                y_hat_mean = torch.mean(y_hat, dim=0, keepdim=True)
-                y_hat = torch.mean(y_hat * y_hat_mean, dim=0, keepdim=True)
+                # y_hat_mean = torch.mean(y_hat, dim=0, keepdim=True)
+                # y_hat = y_hat_mean
 
                 dataloader_iterator = iter(domain_loader)
                 x_target, _, _ = next(dataloader_iterator)
                 x_target=x_target.to(device)
                 y_target = model(x_target)
-                y_hat_target_mean = torch.mean(y_target, dim=0, keepdim=True)
-                y_hat_target = torch.mean(y_target * y_hat_target_mean, dim=0, keepdim=True)
+                # y_hat_target_mean = torch.mean(y_target, dim=0, keepdim=True)
+                # y_hat_target = y_hat_target_mean
 
-                loss_mmd = torch.mean(loss_func(y_hat_target, y_hat))
+                # loss_mmd = torch.mean(loss_func(y_hat_target, y_hat))
+                loss_mmd=mk_mmd_loss(y_target,y_hat)
                 loss += domain_weight * loss_mmd
 
             if adversarial:
@@ -245,8 +248,8 @@ def main():
     print('total parameters:', total_params)
     optim = torch.optim.Adam(parameters, lr=args.lr, weight_decay=0.01)
 
-    train_data, test_data = load_data(args.data_path, train_prop=0.9)
-    # train_data, test_data = load_zero_people(args.test_people,args.data_path)
+    # train_data, test_data = load_data(args.data_path, train_prop=0.9)
+    train_data, test_data = load_zero_people(args.test_people,args.data_path)
 
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=True)
