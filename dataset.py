@@ -80,3 +80,37 @@ def load_zero_people(test_people_list, data_path="./data"):
     a=a.astype(bool)
     b=b.astype(bool)
     return CSI_dataset(magnitude[a], action[a], people[a]),CSI_dataset(magnitude[b], action[b], people[b])
+
+def load_zero_shot(test_people_list=None, test_action_list=None, data_path="./data", func="and"):
+    magnitude = np.load(data_path+"/magnitude_linear.npy").astype(np.float32)
+    phase = np.load(data_path+"/phase_linear.npy").astype(np.float32)
+    magnitude=np.concatenate([np.expand_dims(magnitude, axis=1) ,np.expand_dims(phase, axis=1)],axis=1)
+    people=np.load(data_path+"/people.npy").astype(np.int64)
+    action=np.load(data_path+"/action.npy").astype(np.int64)
+    a = np.zeros_like(people)
+    b = np.zeros_like(people)
+    if test_action_list is None and test_people_list is None:
+        return CSI_dataset(magnitude, action, people)
+    elif test_action_list is None:
+        for i in range(people.shape[0]):
+            a[i]=(people[i] not in test_people_list)
+            b[i]=not a[i]
+    elif test_people_list is None:
+        for i in range(people.shape[0]):
+            a[i]=(action[i] not in test_action_list)
+            b[i]=not a[i]
+    else:
+        if func=="and":
+            for i in range(people.shape[0]):
+                a[i]=(action[i] not in test_action_list or people[i] not in test_people_list)
+                b[i]=not a[i]
+        elif func=="or":
+            for i in range(people.shape[0]):
+                a[i]=(action[i] not in test_action_list and people[i] not in test_people_list)
+                b[i]=not a[i]
+        else:
+            print("ERROR")
+            exit(-1)
+    a=a.astype(bool)
+    b=b.astype(bool)
+    return CSI_dataset(magnitude[a], action[a], people[a]),CSI_dataset(magnitude[b], action[b], people[b])

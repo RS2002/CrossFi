@@ -1,7 +1,7 @@
 from model import Resnet, Attention_Score, DANN
 import torch
 import argparse
-from dataset import load_data, load_zero_people
+from dataset import load_data
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import tqdm
@@ -247,8 +247,7 @@ def main():
     print('total parameters:', total_params)
     optim = torch.optim.Adam(parameters, lr=args.lr, weight_decay=0.01)
 
-    # train_data, test_data = load_data(args.data_path, train_prop=0.9)
-    train_data, test_data = load_zero_people(args.test_people,args.data_path)
+    train_data, test_data = load_data(args.data_path, train_prop=0.9)
 
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=True)

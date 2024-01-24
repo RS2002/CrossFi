@@ -9,6 +9,8 @@ import numpy as np
 import torch.nn.functional as F
 import math
 from func import mk_mmd_loss
+from sklearn.model_selection import train_test_split
+from torch.utils.data import ConcatDataset
 
 domain_weight=1
 
@@ -246,12 +248,14 @@ def main():
 
     # train_data, test_data = load_data(args.data_path, train_prop=0.9)
     if args.task=="action":
-        train_data, test_data = load_zero_shot(test_people_list=args.test_list, data_path=args.data_path)
+        train_data, test_data1 = load_zero_shot(test_people_list=args.test_list, data_path=args.data_path)
     elif args.task=="people":
-        train_data, test_data = load_zero_shot(test_action_list=args.test_list, data_path=args.data_path)
+        train_data, test_data1 = load_zero_shot(test_action_list=args.test_list, data_path=args.data_path)
     else:
         print("ERROR")
         exit(-1)
+    train_data, test_data2 = train_test_split(train_data,test_size=0.1)
+    test_data = ConcatDataset([test_data1,test_data2])
 
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=True)

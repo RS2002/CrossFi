@@ -1,7 +1,7 @@
 from model import Resnet, Attention_Score, DANN
 import torch
 import argparse
-from dataset import load_data, load_zero_people
+from dataset import load_data, load_zero_shot
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import tqdm
@@ -20,7 +20,7 @@ def get_args():
     parser.add_argument("--cpu", action="store_true",default=False)
     parser.add_argument("--cuda", type=str, default='0')
     parser.add_argument('--lr', type=float, default=0.00005)
-    parser.add_argument("--test_people", type=int, nargs='+', default=[0])
+    parser.add_argument("--test_list", type=int, nargs='+', default=[0])
     parser.add_argument('--epoch', type=int, default=30)
     parser.add_argument('--class_num', type=int, default=6) # action:6, people:8
     parser.add_argument('--task', type=str, default="action") # "action" or "people"
@@ -132,53 +132,53 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
     dann.eval()
     torch.set_grad_enabled(False)
 
-
-    template=torch.zeros([class_num,hidden_dim]).to(device)
-    num=0
-    for x,action,people in train_loader:
-        x = x.to(device)
-        if task == "action":
-            label = action.to(device)
-        elif task == "people":
-            label = people.to(device)
-        else:
-            print("ERROR")
-            exit(-1)
-        y = model(x)
-        for i in range(x.shape[0]):
-            if torch.sum(template[label[i]])==0:
-                template[label[i]]=y[i]
-                num+=1
+    if MMD:
+        template=torch.zeros([class_num,hidden_dim]).to(device)
+        num=0
+        for x,action,people in train_loader:
+            x = x.to(device)
+            if task == "action":
+                label = action.to(device)
+            elif task == "people":
+                label = people.to(device)
+            else:
+                print("ERROR")
+                exit(-1)
+            y = model(x)
+            for i in range(x.shape[0]):
+                if torch.sum(template[label[i]])==0:
+                    template[label[i]]=y[i]
+                    num+=1
+                if num==class_num:
+                    break
             if num==class_num:
                 break
-        if num==class_num:
-            break
-
-    # template = torch.zeros([class_num, hidden_dim]).to(device)
-    # template_weights = torch.zeros([class_num, 1]).to(device)
-    # dataloader_iterator = iter(train_loader)
-    # for j in range(2):
-    #     x_train, action_train, people_train = next(dataloader_iterator)
-    #     x_train = x_train.to(device)
-    #     if task == "action":
-    #         label = action_train.to(device)
-    #     elif task == "people":
-    #         label = people_train.to(device)
-    #     else:
-    #         print("ERROR")
-    #         exit(-1)
-    #     y_train = model(x_train)
-    #     score = attn_model(y_train, y_train)
-    #     score = score.unsqueeze(0)
-    #     score = score.unsqueeze(0)
-    #     weight = weight_model(score)
-    #     weight = weight.squeeze()
-    #     weight = F.sigmoid(weight)
-    #     num = y_train.shape[0]
-    #     for i in range(num):
-    #         if weight[i]>template_weights[label[i]]:
-    #             template_weights[label[i]]=weight[i]
-    #             template[label[i]]=y_train[i]
+    else:
+        template = torch.zeros([class_num, hidden_dim]).to(device)
+        template_weights = torch.zeros([class_num, 1]).to(device)
+        dataloader_iterator = iter(train_loader)
+        for j in range(2):
+            x_train, action_train, people_train = next(dataloader_iterator)
+            x_train = x_train.to(device)
+            if task == "action":
+                label = action_train.to(device)
+            elif task == "people":
+                label = people_train.to(device)
+            else:
+                print("ERROR")
+                exit(-1)
+            y_train = model(x_train)
+            score = attn_model(y_train, y_train)
+            score = score.unsqueeze(0)
+            score = score.unsqueeze(0)
+            weight = weight_model(score)
+            weight = weight.squeeze()
+            weight = F.sigmoid(weight)
+            num = y_train.shape[0]
+            for i in range(num):
+                if weight[i]>template_weights[label[i]]:
+                    template_weights[label[i]]=weight[i]
+                    template[label[i]]=y_train[i]
 
     if not train:
         # find the most similar sample as new template
@@ -307,7 +307,13 @@ def main():
     optim = torch.optim.Adam(parameters, lr=args.lr, weight_decay=0.01)
 
     # train_data, test_data = load_data(args.data_path, train_prop=0.9)
-    train_data, test_data = load_zero_people(args.test_people,args.data_path)
+    if args.task=="action":
+        train_data, test_data = load_zero_shot(test_people_list=args.test_list, data_path=args.data_path)
+    elif args.task=="people":
+        train_data, test_data = load_zero_shot(test_action_list=args.test_list, data_path=args.data_path)
+    else:
+        print("ERROR")
+        exit(-1)
 
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=True)
