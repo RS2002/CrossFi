@@ -16,7 +16,7 @@ to be published
 
 
 
-###1.2 Data Pre-process
+### 1.2 Data Pre-process
 
 Each sample has a dimension of 2*t*s, representing the channel, height, and width, respectively.
 
