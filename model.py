@@ -16,7 +16,8 @@ class Resnet(nn.Module):
             mean=torch.mean(x,dim=-1,keepdim=True)
             std=torch.std(x,dim=-1,keepdim=True)
             y=(x-mean)/std
-        y=x
+        else:
+            y=x
         return self.model(y)
 
 class Attention_Score(nn.Module):

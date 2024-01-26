@@ -68,3 +68,6 @@ python zero_shot.py --MMD --task <task name> --class_num <class number> --data_p
 
 
 
+### 3. Comparative Experiment
+
+The repository also includes code for the comparative models mentioned in our article. You can find them in the "Comparative Experiment" folder.

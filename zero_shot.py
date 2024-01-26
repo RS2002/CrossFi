@@ -102,6 +102,8 @@ def pre_train(model, attn_model, dann, data_loader, domain_loader, loss_func, lo
                 loss += (0.5 * loss_truth + 0.5 * loss_false) * domain_weight
 
             model.zero_grad()
+            attn_model.zero_grad()
+            dann.zero_grad()
             loss.backward()
             # nn.utils.clip_grad_norm_(model.parameters(), 3.0)  # 用于裁剪梯度，防止梯度爆炸
             optim.step()
@@ -132,6 +134,8 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
     dann.eval()
     torch.set_grad_enabled(False)
 
+    # flag=False
+    # if flag:
     if MMD:
         template=torch.zeros([class_num,hidden_dim]).to(device)
         num=0
@@ -277,6 +281,9 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
                 loss += (0.5 * loss_truth + 0.5 * loss_false) * domain_weight
 
             model.zero_grad()
+            attn_model.zero_grad()
+            weight_model.zero_grad()
+            dann.zero_grad()
             loss.backward()
             # nn.utils.clip_grad_norm_(model.parameters(), 3.0)  # 用于裁剪梯度，防止梯度爆炸
             optim.step()
