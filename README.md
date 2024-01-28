@@ -53,7 +53,7 @@ python one_shot.py --MMD --task <task name> --class_num <class number> --data_pa
 #### 2.2.2 Cross Class
 
 ```shell
-python cross_class-one_shot.py --MMD --task <task name> --class_num <class number> --data_path <data path> --test_list <the one-shot class>
+python cross_class-one_shot.py --task <task name> --class_num <class number> --data_path <data path> --test_list <the one-shot class>
 ```
 
 
@@ -61,10 +61,26 @@ python cross_class-one_shot.py --MMD --task <task name> --class_num <class numbe
 ### 2.3 Zero-shot
 
 ```shell
-python zero_shot.py --MMD --task <task name> --class_num <class number> --data_path <data path> --test_list <the zero-shot class>
+python zero_shot.py --task <task name> --class_num <class number> --data_path <data path> --test_list <the zero-shot class>
 ```
 
 
+
+### 2.4 Few-shot
+
+### 2.4.1 Cross Domain
+
+```shell
+python few_shot.py --MMD --task <task name> --class_num <class number> --data_path <data path> --test_list <the zero-shot class> --model_path <pre-train model path> --shot_num <k-shot>
+```
+
+
+
+### 2.4.2 Cross Class
+
+```shell
+python  cross_class-few_shot.py --task <task name> --class_num <class number> --data_path <data path> --test_list <the zero-shot class> --model_path <pre-train model path> --shot_num <k-shot>
+```
 
 
 

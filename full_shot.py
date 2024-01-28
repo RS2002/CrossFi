@@ -1,7 +1,7 @@
 from model import Resnet, Attention_Score, DANN
 import torch
 import argparse
-from dataset import load_data
+from dataset import load_data, load_zero_shot
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import tqdm
@@ -19,7 +19,6 @@ def get_args():
     parser.add_argument("--cpu", action="store_true",default=False)
     parser.add_argument("--cuda", type=str, default='0')
     parser.add_argument('--lr', type=float, default=0.00005)
-    parser.add_argument("--test_people", type=int, nargs='+', default=[0])
     parser.add_argument('--epoch', type=int, default=30)
     parser.add_argument('--class_num', type=int, default=6) # action:6, people:8
     parser.add_argument('--task', type=str, default="action") # "action" or "people"
@@ -30,6 +29,9 @@ def get_args():
     parser.add_argument("--MMD", action="store_true",default=False)
     parser.add_argument('--head_num', type=int, default=2)
     parser.add_argument('--hidden_dim', type=int, default=64)
+
+    parser.add_argument("--not_full_shot", action="store_true",default=False)
+    parser.add_argument("--test_list", type=int, nargs='+', default=[0])
 
     args = parser.parse_args()
     return args
@@ -252,7 +254,17 @@ def main():
     print('total parameters:', total_params)
     optim = torch.optim.Adam(parameters, lr=args.lr, weight_decay=0.01)
 
-    train_data, test_data = load_data(args.data_path, train_prop=0.9)
+    if not args.not_full_shot:
+        train_data, test_data = load_data(args.data_path, train_prop=0.9)
+    else:
+        if args.task == "action":
+            train_data, test_data = load_zero_shot(test_people_list=args.test_list, data_path=args.data_path)
+        elif args.task == "people":
+            train_data, test_data = load_zero_shot(test_action_list=args.test_list, data_path=args.data_path)
+        else:
+            print("ERROR")
+            exit(-1)
+
 
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=True)
@@ -291,6 +303,9 @@ def main():
 
         if acc >= best_acc or loss <= best_loss:
             torch.save(model.state_dict(), args.task + ".pth")
+            torch.save(weight_model.state_dict(), args.task + "_weight.pth")
+            torch.save(attn_model.state_dict(), args.task + "_attention.pth")
+
         if acc >= best_acc:
             best_acc = acc
             acc_epoch = 0

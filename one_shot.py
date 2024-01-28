@@ -295,6 +295,8 @@ def main():
 
         if acc >= best_acc or loss <= best_loss:
             torch.save(model.state_dict(), args.task + ".pth")
+            torch.save(weight_model.state_dict(), args.task + "_weight.pth")
+            torch.save(attn_model.state_dict(), args.task + "_attention.pth")
         if acc >= best_acc:
             best_acc = acc
             acc_epoch = 0
