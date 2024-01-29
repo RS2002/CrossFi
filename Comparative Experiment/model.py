@@ -48,3 +48,23 @@ class DANN(nn.Module):
         y = self.GRL.apply(y,alpha)
         y=self.linear(y)
         return y
+
+class MLP(nn.Module):
+    def __init__(self,input_dim=64, output_dim=2, dropout_rate=0.3):
+        super().__init__()
+        self.model=nn.Sequential(
+            nn.Linear(input_dim,256),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(256, 64),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(64, output_dim),
+        )
+
+    def forward(self,x):
+        # print(x.shape)
+        return self.model(x)

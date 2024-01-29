@@ -8,9 +8,8 @@ import tqdm
 import numpy as np
 import torch.nn.functional as F
 import math
+import copy
 from func import mk_mmd_loss
-from sklearn.model_selection import train_test_split
-from torch.utils.data import ConcatDataset
 
 domain_weight=1
 
@@ -33,7 +32,7 @@ def get_args():
     parser.add_argument('--head_num', type=int, default=2)
     parser.add_argument('--hidden_dim', type=int, default=64)
 
-    parser.add_argument('--score', type=str, default="attention") # "distance" or "cosine"
+    parser.add_argument('--score', type=str, default="attention") # "distance" or "cos"
 
     args = parser.parse_args()
     return args
@@ -69,13 +68,10 @@ def pre_train(model, attn_model, dann, data_loader, domain_loader, loss_func, lo
         num=label.shape[0]
         y=label.unsqueeze(1).repeat(1,num)
         y=(y==y.t()).float()
-        if attn_model.score=="distance":
-            loss=(score*(y!=0))**2+((3-score)*(y==0))**2
-        else:
-            loss=loss_func(score,y)
+        loss=loss_func(score,y)
         loss[y>0.5]*=w
         loss=torch.mean(loss)
-        loss_list.append(loss.item())
+
 
         if train:
             if MMD:
@@ -111,14 +107,14 @@ def pre_train(model, attn_model, dann, data_loader, domain_loader, loss_func, lo
             attn_model.zero_grad()
             dann.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), 3.0)  # 用于裁剪梯度，防止梯度爆炸
+            # nn.utils.clip_grad_norm_(model.parameters(), 3.0)  # 用于裁剪梯度，防止梯度爆炸
             optim.step()
 
         score[score>0.5]=1
         score[score<=0.5]=0
-        if attn_model.score=="distance":
-            score=1-score
         acc=torch.mean((score.int()==y.int()).float())
+
+        loss_list.append(loss.item())
         acc_list.append(acc.item())
 
     return np.mean(loss_list), np.mean(acc_list)
@@ -134,32 +130,62 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
     else:
         data_loader=test_loader
 
-    # generate template
     model.eval()
     attn_model.eval()
     weight_model.train()
     dann.eval()
     torch.set_grad_enabled(False)
-    template=torch.zeros([class_num,hidden_dim]).to(device)
-    num=0
-    for x,action,people in data_loader:
-        x = x.to(device)
-        if task == "action":
-            label = action.to(device)
-        elif task == "people":
-            label = people.to(device)
-        else:
-            print("ERROR")
-            exit(-1)
-        y = model(x)
-        for i in range(x.shape[0]):
-            if torch.sum(template[label[i]])==0:
-                template[label[i]]=y[i]
-                num+=1
-            if num==class_num:
+
+    flag=True
+    if flag:
+        template = torch.zeros([class_num, hidden_dim]).to(device)
+        num = 0
+        for x, action, people in train_loader:
+            x = x.to(device)
+            if task == "action":
+                label = action.to(device)
+            elif task == "people":
+                label = people.to(device)
+            else:
+                print("ERROR")
+                exit(-1)
+            y = model(x)
+            for i in range(x.shape[0]):
+                if torch.sum(template[label[i]]) == 0:
+                    template[label[i]] = y[i]
+                    num += 1
+                if num == class_num:
+                    break
+            if num == class_num:
                 break
-        if num==class_num:
-            break
+    else:
+        template = torch.zeros([class_num, hidden_dim]).to(device)
+        template_weights = torch.zeros([class_num, 1]).to(device)
+        dataloader_iterator = iter(train_loader)
+        for j in range(2):
+            x_train, action_train, people_train = next(dataloader_iterator)
+            x_train = x_train.to(device)
+            if task == "action":
+                label = action_train.to(device)
+            elif task == "people":
+                label = people_train.to(device)
+            else:
+                print("ERROR")
+                exit(-1)
+            y_train = model(x_train)
+            score = attn_model(y_train, y_train)
+            score = score.unsqueeze(0)
+            score = score.unsqueeze(0)
+            weight = weight_model(score)
+            weight = weight.squeeze()
+            weight = F.sigmoid(weight)
+            num = y_train.shape[0]
+            for i in range(num):
+                if weight[i] > template_weights[label[i]]:
+                    template_weights[label[i]] = weight[i]
+                    template[label[i]] = y_train[i]
+    template_weights = torch.zeros([class_num, 1]).to(device)
+    new_template=template.clone()
 
     if train:
         model.train()
@@ -183,27 +209,21 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
         else:
             print("ERROR")
             exit(-1)
-        y_hat=model(x)
-        score=attn_model(y_hat,template)
-        if attn_model.score=="distance":
-            output=torch.argmin(score, dim=-1)
-        else:
-            output=torch.argmax(score, dim=-1)
-        acc=torch.mean((output==label).float())
-        num=label.shape[0]
-        y=torch.zeros([num,class_num]).to(device)
-        for i in range(num):
-            y[i,label[i]]=1
-
-        if attn_model.score=="distance":
-            loss=(score*(y!=0))**2+((3-score)*(y==0))**2
-        else:
-            loss=loss_func(score,y)
-        loss[y>0.5]*=w
-        loss=torch.mean(loss)
-        loss_list.append(loss.item())
 
         if train:
+            y_hat=model(x)
+            score=attn_model(y_hat,template)
+            output=torch.argmax(score, dim=-1)
+            acc=torch.mean((output==label).float())
+            num=label.shape[0]
+            y=torch.zeros([num,class_num]).to(device)
+            for i in range(num):
+                y[i,label[i]]=1
+
+            loss=loss_func(score,y)
+            loss[y>0.5]*=w
+            loss=torch.mean(loss)
+
             if MMD:
                 # y_hat_mean = torch.mean(y_hat, dim=0, keepdim=True)
                 # y_hat = y_hat_mean
@@ -226,7 +246,7 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
 
                 dataloader_iterator = iter(domain_loader)
                 x_false, label_false, _ = next(dataloader_iterator)
-                x_false=x_false.to(device)
+                x_false = x_false.to(device)
                 false = torch.zeros_like(label_false).to(device)
                 false_hat = dann(x_false, alpha=alpha)
                 loss_false = loss_cls(false_hat, false)
@@ -238,11 +258,33 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
             weight_model.zero_grad()
             dann.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), 3.0)  # 用于裁剪梯度，防止梯度爆炸
+            # nn.utils.clip_grad_norm_(model.parameters(), 3.0)  # 用于裁剪梯度，防止梯度爆炸
             optim.step()
-        acc_list.append(acc.item())
 
-    return np.mean(loss_list), np.mean(acc_list)
+            loss_list.append(loss.item())
+            acc_list.append(acc.item())
+        else:
+            for i in range(x.shape[0]):
+                y_hat = model(x[i:i+1])
+                score = attn_model(y_hat, new_template)
+                output = torch.argmax(score, dim=-1)
+                acc = torch.mean((output == label[i:i+1]).float())
+                acc_list.append(acc.item())
+
+                y = torch.zeros([1, class_num]).to(device)
+                y[0, label[i]] = 1
+                loss = loss_func(score, y)
+                loss[y > 0.5] *= w
+                loss = torch.mean(loss)
+                loss_list.append(loss.item())
+
+                score = attn_model(y_hat, template)
+                if score[0,output[0]]>template_weights[output[0]]:
+                    template_weights[output[0]]=score[0,output[0]]
+                    new_template[output[0]]=y_hat[0]
+
+
+    return np.mean(loss_list), np.mean(acc_list), acc_list
 
 def main():
     args=get_args()
@@ -266,14 +308,12 @@ def main():
 
     # train_data, test_data = load_data(args.data_path, train_prop=0.9)
     if args.task=="action":
-        train_data, test_data1 = load_zero_shot(test_people_list=args.test_list, data_path=args.data_path)
+        train_data, test_data = load_zero_shot(test_people_list=args.test_list, data_path=args.data_path)
     elif args.task=="people":
-        train_data, test_data1 = load_zero_shot(test_action_list=args.test_list, data_path=args.data_path)
+        train_data, test_data = load_zero_shot(test_action_list=args.test_list, data_path=args.data_path)
     else:
         print("ERROR")
         exit(-1)
-    train_data, test_data2 = train_test_split(train_data,test_size=0.1)
-    test_data = ConcatDataset([test_data1,test_data2])
 
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=True)
@@ -296,14 +336,14 @@ def main():
         pre_train(model, attn_model, dann, train_loader, test_loader, loss_func, loss_cls, optim, device, args.task,
                   class_num, train=True, adversarial=args.adversarial, alpha=alpha, MMD=args.MMD)
 
-        loss, acc = iteration(model, attn_model, weight_model, dann, train_loader, test_loader, loss_func, loss_cls, optim, device,
+        loss, acc, _ = iteration(model, attn_model, weight_model, dann, train_loader, test_loader, loss_func, loss_cls, optim, device,
                   args.task, class_num, args.hidden_dim, train=True, adversarial=args.adversarial, alpha=alpha, MMD=args.MMD)
         log = "Epoch {} | Train Loss {:06f},  Train Acc {:06f} | ".format(j, loss, acc)
         print(log)
         with open(args.task+".txt", 'a') as file:
             file.write(log)
 
-        loss, acc = iteration(model, attn_model, weight_model, dann, train_loader, test_loader, loss_func, loss_cls, optim, device,
+        loss, acc, acc_list = iteration(model, attn_model, weight_model, dann, train_loader, test_loader, loss_func, loss_cls, optim, device,
                   args.task, class_num, args.hidden_dim, train=False, adversarial=False, alpha=alpha, MMD=False)
         log = "Test Loss {:06f}, Test Acc {:06f} ".format(loss,acc)
         print(log)
@@ -314,6 +354,7 @@ def main():
             torch.save(model.state_dict(), args.task + ".pth")
             torch.save(weight_model.state_dict(), args.task + "_weight.pth")
             torch.save(attn_model.state_dict(), args.task + "_attention.pth")
+            np.save("acc_list.npy", np.array(acc_list))
         if acc >= best_acc:
             best_acc = acc
             acc_epoch = 0

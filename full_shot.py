@@ -33,6 +33,10 @@ def get_args():
     parser.add_argument("--not_full_shot", action="store_true",default=False)
     parser.add_argument("--test_list", type=int, nargs='+', default=[0])
 
+    parser.add_argument('--template', type=str, default="WeightNet") # "WeightNet" or "Average" or "Random"
+    parser.add_argument('--score', type=str, default="attention") # "distance" or "cosine"
+
+
     args = parser.parse_args()
     return args
 
@@ -67,7 +71,10 @@ def pre_train(model, attn_model, dann, data_loader, domain_loader, loss_func, lo
         num=label.shape[0]
         y=label.unsqueeze(1).repeat(1,num)
         y=(y==y.t()).float()
-        loss=loss_func(score,y)
+        if attn_model.score=="distance":
+            loss=(score*(y!=0))**2+((3-score)*(y==0))**2
+        else:
+            loss=loss_func(score,y)
         loss[y>0.5]*=w
         loss=torch.mean(loss)
         loss_list.append(loss.item())
@@ -111,12 +118,14 @@ def pre_train(model, attn_model, dann, data_loader, domain_loader, loss_func, lo
 
         score[score>0.5]=1
         score[score<=0.5]=0
+        if attn_model.score=="distance":
+            score=1-score
         acc=torch.mean((score.int()==y.int()).float())
         acc_list.append(acc.item())
 
     return np.mean(loss_list), np.mean(acc_list)
 
-def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, loss_func, loss_cls, optim, device, task, class_num, hidden_dim, train=True, adversarial=False, alpha=1.0, MMD=False):
+def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, loss_func, loss_cls, optim, device, task, class_num, hidden_dim, train=True, adversarial=False, alpha=1.0, MMD=False, template_method="WeightNet"):
     w=class_num
 
     if train:
@@ -144,31 +153,75 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
     for x, action, people in pbar:
 
         # generate template
-        template=torch.zeros([class_num,hidden_dim]).to(device)
-        template_weights=torch.zeros([class_num,1]).to(device)
-        dataloader_iterator = iter(train_loader)
-        for j in range(2):
-            x_train, action_train, people_train = next(dataloader_iterator)
-            x_train = x_train.to(device)
-            if task == "action":
-                label = action_train.to(device)
-            elif task == "people":
-                label = people_train.to(device)
-            else:
-                print("ERROR")
-                exit(-1)
-            y_train = model(x_train)
-            score = attn_model(y_train, y_train)
-            score = score.unsqueeze(0)
-            score = score.unsqueeze(0)
-            weight = weight_model(score)
-            weight = weight.squeeze()
-            weight = F.sigmoid(weight)
-            num = y_train.shape[0]
-            for i in range(num):
-                template[label[i]] += y_train[i] * weight[i]
-                template_weights[label[i]] += weight[i]
-        template=template/template_weights
+        if template_method=="WeightNet":
+            template=torch.zeros([class_num,hidden_dim]).to(device)
+            template_weights=torch.zeros([class_num,1]).to(device)
+            dataloader_iterator = iter(train_loader)
+            for j in range(2):
+                x_train, action_train, people_train = next(dataloader_iterator)
+                x_train = x_train.to(device)
+                if task == "action":
+                    label = action_train.to(device)
+                elif task == "people":
+                    label = people_train.to(device)
+                else:
+                    print("ERROR")
+                    exit(-1)
+                y_train = model(x_train)
+                score = attn_model(y_train, y_train)
+                score = score.unsqueeze(0)
+                score = score.unsqueeze(0)
+                weight = weight_model(score)
+                weight = weight.squeeze()
+                weight = F.sigmoid(weight)
+                num = y_train.shape[0]
+                for i in range(num):
+                    template[label[i]] += y_train[i] * weight[i]
+                    template_weights[label[i]] += weight[i]
+            template=template/template_weights
+        elif template_method=="random":
+            template = torch.zeros([class_num, hidden_dim]).to(device)
+            num = 0
+            for x_train, action_train, people_train in train_loader:
+                x_train = x_train.to(device)
+                if task == "action":
+                    label = action_train.to(device)
+                elif task == "people":
+                    label = people_train.to(device)
+                else:
+                    print("ERROR")
+                    exit(-1)
+                y_train = model(x_train)
+                for i in range(x_train.shape[0]):
+                    if torch.sum(template[label[i]]) == 0:
+                        template[label[i]] = y_train[i]
+                        num += 1
+                    if num == class_num:
+                        break
+                if num == class_num:
+                    break
+        elif template_method=="average":
+            template = torch.zeros([class_num, hidden_dim]).to(device)
+            template_weights = torch.zeros([class_num, 1]).to(device)
+            dataloader_iterator = iter(train_loader)
+            for x_train, action_train, people_train in dataloader_iterator:
+                x_train = x_train.to(device)
+                if task == "action":
+                    label = action_train.to(device)
+                elif task == "people":
+                    label = people_train.to(device)
+                else:
+                    print("ERROR")
+                    exit(-1)
+                y_train = model(x_train)
+                num = y_train.shape[0]
+                for i in range(num):
+                    template[label[i]] += y_train[i]
+                    template_weights[label[i]] += 1
+            template=template/template_weights
+        else:
+            print("ERROR")
+            exit(-1)
 
         x=x.to(device)
         if task == "action":
@@ -180,14 +233,20 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
             exit(-1)
         y_hat=model(x)
         score=attn_model(y_hat,template)
-        output=torch.argmax(score, dim=-1)
+        if attn_model.score=="distance":
+            output=torch.argmin(score, dim=-1)
+        else:
+            output=torch.argmax(score, dim=-1)
         acc=torch.mean((output==label).float())
         num=label.shape[0]
         y=torch.zeros([num,class_num]).to(device)
         for i in range(num):
             y[i,label[i]]=1
 
-        loss=loss_func(score,y)
+        if attn_model.score=="distance":
+            loss=(score*(y!=0))**2+((3-score)*(y==0))**2
+        else:
+            loss=loss_func(score,y)
         loss[y>0.5]*=w
         loss=torch.mean(loss)
         loss_list.append(loss.item())
@@ -243,7 +302,7 @@ def main():
     model = model.to(device)
     weight_model = Resnet(output_dims=args.batch_size,channel=1,pretrained=True, norm=args.weight_norm)
     weight_model = weight_model.to(device)
-    attn_model = Attention_Score(args.hidden_dim,args.hidden_dim)
+    attn_model = Attention_Score(args.hidden_dim,args.hidden_dim,method=args.score)
     attn_model = attn_model.to(device)
     dann = DANN(model, args.hidden_dim)
     dann = dann.to(device)
@@ -288,14 +347,14 @@ def main():
                   class_num, train=True, adversarial=args.adversarial, alpha=alpha, MMD=args.MMD)
 
         loss, acc = iteration(model, attn_model, weight_model, dann, train_loader, test_loader, loss_func, loss_cls, optim, device,
-                  args.task, class_num, args.hidden_dim, train=True, adversarial=args.adversarial, alpha=alpha, MMD=args.MMD)
+                  args.task, class_num, args.hidden_dim, train=True, adversarial=args.adversarial, alpha=alpha, MMD=args.MMD,template_method=args.template)
         log = "Epoch {} | Train Loss {:06f},  Train Acc {:06f} | ".format(j, loss, acc)
         print(log)
         with open(args.task+".txt", 'a') as file:
             file.write(log)
 
         loss, acc = iteration(model, attn_model, weight_model, dann, train_loader, test_loader, loss_func, loss_cls, optim, device,
-                  args.task, class_num, args.hidden_dim, train=False, adversarial=False, alpha=alpha, MMD=False)
+                  args.task, class_num, args.hidden_dim, train=False, adversarial=False, alpha=alpha, MMD=False,template_method=args.template)
         log = "Test Loss {:06f}, Test Acc {:06f} ".format(loss,acc)
         print(log)
         with open(args.task+".txt", 'a') as file:

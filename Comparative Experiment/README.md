@@ -36,7 +36,19 @@ python Resnet.py --task <task name> --class_num <class num> --MK_MMD
 
 
 
+### Resnet-GAN
+
+```shell
+python Resnet.py --task <task name> --class_num <class num> --GAN
+```
+
+
+
 ## Siamese
+
+```shell
+python Siamese.py --task <task name> --class_num <class num>
+```
 
 
 

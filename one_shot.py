@@ -31,6 +31,8 @@ def get_args():
     parser.add_argument('--head_num', type=int, default=2)
     parser.add_argument('--hidden_dim', type=int, default=64)
 
+    parser.add_argument('--score', type=str, default="attention") # "distance" or "cosine"
+
     args = parser.parse_args()
     return args
 
@@ -65,7 +67,10 @@ def pre_train(model, attn_model, dann, data_loader, domain_loader, loss_func, lo
         num=label.shape[0]
         y=label.unsqueeze(1).repeat(1,num)
         y=(y==y.t()).float()
-        loss=loss_func(score,y)
+        if attn_model.score=="distance":
+            loss=(score*(y!=0))**2+((3-score)*(y==0))**2
+        else:
+            loss=loss_func(score,y)
         loss[y>0.5]*=w
         loss=torch.mean(loss)
         loss_list.append(loss.item())
@@ -109,6 +114,8 @@ def pre_train(model, attn_model, dann, data_loader, domain_loader, loss_func, lo
 
         score[score>0.5]=1
         score[score<=0.5]=0
+        if attn_model.score=="distance":
+            score=1-score
         acc=torch.mean((score.int()==y.int()).float())
         acc_list.append(acc.item())
 
@@ -176,14 +183,20 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
             exit(-1)
         y_hat=model(x)
         score=attn_model(y_hat,template)
-        output=torch.argmax(score, dim=-1)
+        if attn_model.score=="distance":
+            output=torch.argmin(score, dim=-1)
+        else:
+            output=torch.argmax(score, dim=-1)
         acc=torch.mean((output==label).float())
         num=label.shape[0]
         y=torch.zeros([num,class_num]).to(device)
         for i in range(num):
             y[i,label[i]]=1
 
-        loss=loss_func(score,y)
+        if attn_model.score=="distance":
+            loss=(score*(y!=0))**2+((3-score)*(y==0))**2
+        else:
+            loss=loss_func(score,y)
         loss[y>0.5]*=w
         loss=torch.mean(loss)
         loss_list.append(loss.item())
@@ -238,7 +251,7 @@ def main():
     model = model.to(device)
     weight_model = Resnet(output_dims=args.batch_size,channel=1,pretrained=True, norm=args.weight_norm)
     weight_model = weight_model.to(device)
-    attn_model = Attention_Score(args.hidden_dim,args.hidden_dim)
+    attn_model = Attention_Score(args.hidden_dim,args.hidden_dim,method=args.score)
     attn_model = attn_model.to(device)
     dann = DANN(model, args.hidden_dim)
     dann = dann.to(device)

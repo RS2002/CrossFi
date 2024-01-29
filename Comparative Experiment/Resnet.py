@@ -1,4 +1,4 @@
-from model import Resnet,DANN
+from model import Resnet,DANN,MLP
 import torch
 import argparse
 from dataset import load_data, load_zero_shot
@@ -28,13 +28,15 @@ def get_args():
     parser.add_argument("--DANN", action="store_true",default=False)
     parser.add_argument("--MMD", action="store_true",default=False)
     parser.add_argument("--MK_MMD", action="store_true",default=False)
+    parser.add_argument("--GAN", action="store_true",default=False)
+
 
 
 
     args = parser.parse_args()
     return args
 
-def iteration(model, data_loader, domain_loader,loss_func, optim, device, task, dann, train=True, DANN=False, alpha=1.0, MMD=False, MK_MMD=False):
+def iteration(model, data_loader, domain_loader,loss_func, optim, device, task, dann, discriminator, optim_dis, train=True, DANN=False, alpha=1.0, MMD=False, MK_MMD=False, GAN=False):
     if train:
         model.train()
         torch.set_grad_enabled(True)
@@ -75,6 +77,7 @@ def iteration(model, data_loader, domain_loader,loss_func, optim, device, task, 
 
                 loss += (0.5 * loss_truth + 0.5 * loss_false)
 
+
             if MMD or MK_MMD:
                 dataloader_iterator = iter(domain_loader)
                 x_target, _, _ = next(dataloader_iterator)
@@ -86,6 +89,28 @@ def iteration(model, data_loader, domain_loader,loss_func, optim, device, task, 
                     loss_mmd = mk_mmd_loss(y_target, y_hidden)
                 loss += loss_mmd
 
+            if GAN and y_hidden.shape[0]==64:
+                loss_cross = nn.CrossEntropyLoss()
+
+                dataloader_iterator = iter(domain_loader)
+                x_target, _, _ = next(dataloader_iterator)
+                x_target = x_target.to(device)
+                _, y_target = model(x_target)
+
+                false = torch.zeros(y_target.shape[0], dtype=torch.long).to(device)
+                truth = torch.ones(y_hidden.shape[0],dtype=torch.long).to(device)
+
+                loss_truth = loss_cross(discriminator(y_hidden.detach()),truth)
+                loss_false = loss_cross(discriminator(y_target.detach()),false)
+                dis_loss=loss_truth+loss_false
+
+                discriminator.zero_grad()
+                dis_loss.backward()
+                optim_dis.step()
+
+                discriminator.eval()
+                gen_loss = 0.5 * loss_cross(discriminator(y_target),truth) + 0.5 * loss_cross(discriminator(y_hidden),false)
+                loss+=gen_loss
 
             model.zero_grad()
             dann.zero_grad()
@@ -109,11 +134,15 @@ def main():
     dann = DANN(model, 64)
     dann = dann.to(device)
 
+    discriminator = MLP(input_dim=64,output_dim=2)
+    discriminator = discriminator.to(device)
+
     parameters = set(model.parameters()) | set(dann.parameters())
 
     total_params = sum(p.numel() for p in parameters if p.requires_grad)
     print('total parameters:', total_params)
     optim = torch.optim.Adam(parameters, lr=args.lr, weight_decay=0.01)
+    optim_dis = torch.optim.Adam(discriminator.parameters(), lr=args.lr, weight_decay=0.01)
 
     # train_data, test_data = load_data(args.data_path, train_prop=0.9)
     if args.task=="action":
@@ -142,12 +171,12 @@ def main():
         else:
             alpha = 2.0 / (1.0 + math.exp(-10 * j / num)) - 1
 
-        loss, acc = iteration(model, train_loader, test_loader, loss_func, optim, device, args.task, dann, train=True, DANN=args.DANN, alpha=alpha, MMD=args.MMD, MK_MMD=args.MK_MMD)
+        loss, acc = iteration(model, train_loader, test_loader, loss_func, optim, device, args.task, dann, discriminator, optim_dis, train=True, DANN=args.DANN, alpha=alpha, MMD=args.MMD, MK_MMD=args.MK_MMD, GAN=args.GAN)
         log = "Epoch {} | Train Loss {:06f},  Train Acc {:06f} | ".format(j, loss, acc)
         print(log)
         with open(args.task+".txt", 'a') as file:
             file.write(log)
-        loss, acc = iteration(model, test_loader, test_loader, loss_func, optim, device, args.task, dann, train=False)
+        loss, acc = iteration(model, test_loader, test_loader, loss_func, optim, device, args.task, dann, discriminator, optim_dis, train=False)
         log = "Test Loss {:06f}, Test Acc {:06f} ".format(loss,acc)
         print(log)
         with open(args.task+".txt", 'a') as file:

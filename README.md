@@ -45,7 +45,7 @@ If you do not want to use MK-MMD during training, you can omit this parameter. T
 #### 2.2.1 Cross Domain
 
 ```shell
-python one_shot.py --MMD --task <task name> --class_num <class number> --data_path <data path> --test_list <the one-shot class>
+python one_shot.py --MMD --task <task name> --class_num <class number> --data_path <data path> --test_list <the one-shot class> --score distance
 ```
 
 
@@ -71,7 +71,7 @@ python zero_shot.py --task <task name> --class_num <class number> --data_path <d
 ### 2.4.1 Cross Domain
 
 ```shell
-python few_shot.py --MMD --task <task name> --class_num <class number> --data_path <data path> --test_list <the zero-shot class> --model_path <pre-train model path> --shot_num <k-shot>
+python few_shot.py --MMD --task <task name> --class_num <class number> --data_path <data path> --test_list <the zero-shot class> --model_path <pre-train model path> --shot_num <k-shot> --score distance
 ```
 
 

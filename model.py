@@ -2,6 +2,7 @@ import torch.nn as nn
 import torchvision.models as models
 import torch
 from torch.autograd import Function
+import torch.nn.functional as F
 
 class Resnet(nn.Module):
     def __init__(self, output_dims=64, channel=2, pretrained=True, norm=False):
@@ -21,8 +22,9 @@ class Resnet(nn.Module):
         return self.model(y)
 
 class Attention_Score(nn.Module):
-    def __init__(self, input_dims=64,hidden_dims=64,head=1):
+    def __init__(self, input_dims=64,hidden_dims=64,head=1, method="attention"):
         super().__init__()
+        self.score=method
         if hidden_dims%head!=0:
             print("ERROR")
             exit(-1)
@@ -35,17 +37,28 @@ class Attention_Score(nn.Module):
 
 
     def forward(self,q,k):
-        query=self.q_linear(q)
-        key=self.k_linear(k)
+        if self.score=="attention":
+            query=self.q_linear(q)
+            key=self.k_linear(k)
 
-        query=query.view(-1,self.head,self.num).transpose(0, 1)
-        key=key.view(-1,self.head,self.num).transpose(0, 1)
+            query=query.view(-1,self.head,self.num).transpose(0, 1)
+            key=key.view(-1,self.head,self.num).transpose(0, 1)
 
-        attn_matrix=torch.bmm(query,key.transpose(1, 2))
-        attn_matrix=torch.sum(attn_matrix,dim=0)
+            attn_matrix=torch.bmm(query,key.transpose(1, 2))
+            attn_matrix=torch.sum(attn_matrix,dim=0)
 
-
-        return self.sigmoid(attn_matrix)
+            return self.sigmoid(attn_matrix)
+        elif self.score=="distance":
+            gaussian_dist = torch.cdist(q, k, p=2)
+            return gaussian_dist
+        elif self.score=="cosine":
+            q_normalized = F.normalize(q, dim=1)
+            k_normalized = F.normalize(k, dim=1)
+            cos_sim = torch.mm(q_normalized, k_normalized.t())
+            return (cos_sim+1)/2
+        else:
+            print("ERROR")
+            exit(-1)
 
 
 class GRL(Function):
