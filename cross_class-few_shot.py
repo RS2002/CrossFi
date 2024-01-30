@@ -29,7 +29,8 @@ def get_args():
     parser.add_argument("--norm", action="store_true",default=False)
     parser.add_argument("--weight_norm", action="store_true",default=False)
     parser.add_argument("--adversarial", action="store_true",default=False)
-    parser.add_argument("--MMD", action="store_true",default=False)
+    parser.add_argument("--pretrain_MMD", action="store_true",default=False)
+    parser.add_argument("--test_MMD", action="store_true",default=False)
     parser.add_argument('--head_num', type=int, default=2)
     parser.add_argument('--hidden_dim', type=int, default=64)
 
@@ -37,6 +38,7 @@ def get_args():
     parser.add_argument("--model_path", type=str, default='./')
     parser.add_argument("--test_list", type=int, nargs='+', default=[0])
 
+    parser.add_argument('--score', type=str, default="attention") # "distance" or "cosine"
 
 
     args = parser.parse_args()
@@ -125,7 +127,10 @@ def pre_train(model, attn_model, dann, data_loader, domain_loader, loss_func, lo
         num=label.shape[0]
         y=label.unsqueeze(1).repeat(1,num)
         y=(y==y.t()).float()
-        loss=loss_func(score,y)
+        if attn_model.score=="distance":
+            loss=(score*(y!=0))**2+((3-score)*(y==0))**2
+        else:
+            loss=loss_func(score,y)
         loss[y>0.5]*=w
         loss=torch.mean(loss)
         loss_list.append(loss.item())
@@ -169,6 +174,8 @@ def pre_train(model, attn_model, dann, data_loader, domain_loader, loss_func, lo
 
         score[score>0.5]=1
         score[score<=0.5]=0
+        if attn_model.score=="distance":
+            score=1-score
         acc=torch.mean((score.int()==y.int()).float())
         acc_list.append(acc.item())
 
@@ -240,14 +247,20 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
             exit(-1)
         y_hat=model(x)
         score=attn_model(y_hat,template)
-        output=torch.argmax(score, dim=-1)
+        if attn_model.score=="distance":
+            output=torch.argmin(score, dim=-1)
+        else:
+            output=torch.argmax(score, dim=-1)
         acc=torch.mean((output==label).float())
         num=label.shape[0]
         y=torch.zeros([num,class_num]).to(device)
         for i in range(num):
             y[i,label[i]]=1
 
-        loss=loss_func(score,y)
+        if attn_model.score == "distance":
+            loss = (score * (y != 0)) ** 2 + ((3 - score) * (y == 0)) ** 2
+        else:
+            loss = loss_func(score, y)
         loss[y>0.5]*=w
         loss=torch.mean(loss)
         loss_list.append(loss.item())
@@ -334,6 +347,9 @@ def main():
     domain_loader = DataLoader(domain_data, batch_size=args.batch_size, shuffle=True)
     # domain_loader = test_loader
 
+    domain_loader1=domain_loader
+    domain_loader2=test_loader
+
     train_data = few_shot(test_loader, task=args.task, class_num=args.class_num, shot_num=args.shot_num)
     # train_data = few_shot(test_loader, task=args.task, class_num=args.class_num, shot_num=args.shot_num, expand_to_num=args.batch_size)
 
@@ -354,11 +370,11 @@ def main():
             alpha = 1.0
         else:
             alpha = 2.0 / (1.0 + math.exp(-10 * j / num)) - 1
-        pre_train(model, attn_model, dann, train_loader, domain_loader, loss_func, loss_cls, optim, device, args.task,
-                  class_num, train=True, adversarial=args.adversarial, alpha=alpha, MMD=args.MMD)
+        pre_train(model, attn_model, dann, train_loader, domain_loader1, loss_func, loss_cls, optim, device, args.task,
+                  class_num, train=True, adversarial=args.adversarial, alpha=alpha, MMD=args.pretrain_MMD)
 
-        loss, acc = iteration(model, attn_model, weight_model, dann, train_loader, domain_loader, loss_func, loss_cls, optim, device,
-                  args.task, class_num, args.hidden_dim, train=True, adversarial=args.adversarial, alpha=alpha, MMD=args.MMD, batch_size=args.batch_size)
+        loss, acc = iteration(model, attn_model, weight_model, dann, train_loader, domain_loader2, loss_func, loss_cls, optim, device,
+                  args.task, class_num, args.hidden_dim, train=True, adversarial=args.adversarial, alpha=alpha, MMD=args.test_MMD, batch_size=args.batch_size)
         log = "Epoch {} | Train Loss {:06f},  Train Acc {:06f} | ".format(j, loss, acc)
         print(log)
         with open(args.task+"_finetune.txt", 'a') as file:
