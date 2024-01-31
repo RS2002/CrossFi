@@ -266,9 +266,9 @@ def main():
 
     # train_data, test_data = load_data(args.data_path, train_prop=0.9)
     if args.task=="action":
-        train_data, test_data1 = load_zero_shot(test_people_list=args.test_list, data_path=args.data_path)
-    elif args.task=="people":
         train_data, test_data1 = load_zero_shot(test_action_list=args.test_list, data_path=args.data_path)
+    elif args.task=="people":
+        train_data, test_data1 = load_zero_shot(test_people_list=args.test_list, data_path=args.data_path)
     else:
         print("ERROR")
         exit(-1)

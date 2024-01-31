@@ -9,6 +9,8 @@ import numpy as np
 import torch.nn.functional as F
 import math
 from func import mk_mmd_loss
+from sklearn.model_selection import train_test_split
+from torch.utils.data import ConcatDataset
 
 domain_weight=1
 
@@ -31,6 +33,7 @@ def get_args():
     parser.add_argument('--hidden_dim', type=int, default=64)
 
     parser.add_argument("--not_full_shot", action="store_true",default=False)
+    parser.add_argument("--novel_class", action="store_true",default=False)
     parser.add_argument("--test_list", type=int, nargs='+', default=[0])
 
     parser.add_argument('--template', type=str, default="WeightNet") # "WeightNet" or "Average" or "Random"
@@ -178,6 +181,7 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
                 for i in range(num):
                     template[label[i]] += y_train[i] * weight[i]
                     template_weights[label[i]] += weight[i]
+            template_weights[template_weights==0]+=1
             template=template/template_weights
         elif template_method=="random":
             template = torch.zeros([class_num, hidden_dim]).to(device)
@@ -218,6 +222,7 @@ def iteration(model, attn_model, weight_model, dann, train_loader, test_loader, 
                 for i in range(num):
                     template[label[i]] += y_train[i]
                     template_weights[label[i]] += 1
+            template_weights[template_weights==0]+=1
             template=template/template_weights
         else:
             print("ERROR")
@@ -316,13 +321,24 @@ def main():
     if not args.not_full_shot:
         train_data, test_data = load_data(args.data_path, train_prop=0.9)
     else:
-        if args.task == "action":
-            train_data, test_data = load_zero_shot(test_people_list=args.test_list, data_path=args.data_path)
-        elif args.task == "people":
-            train_data, test_data = load_zero_shot(test_action_list=args.test_list, data_path=args.data_path)
+        if args.novel_class:
+            if args.task == "action":
+                train_data, test_data1 = load_zero_shot(test_action_list=args.test_list, data_path=args.data_path)
+            elif args.task == "people":
+                train_data, test_data1 = load_zero_shot(test_people_list=args.test_list, data_path=args.data_path)
+            else:
+                print("ERROR")
+                exit(-1)
+            train_data, test_data2 = train_test_split(train_data, test_size=0.1, random_state=113)
+            test_data = ConcatDataset([test_data1, test_data2])
         else:
-            print("ERROR")
-            exit(-1)
+            if args.task == "action":
+                train_data, test_data = load_zero_shot(test_people_list=args.test_list, data_path=args.data_path)
+            elif args.task == "people":
+                train_data, test_data = load_zero_shot(test_action_list=args.test_list, data_path=args.data_path)
+            else:
+                print("ERROR")
+                exit(-1)
 
 
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)

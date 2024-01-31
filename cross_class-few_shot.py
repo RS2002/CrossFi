@@ -21,7 +21,7 @@ def get_args():
     parser.add_argument("--data_path",type=str,default="./data")
     parser.add_argument("--cpu", action="store_true",default=False)
     parser.add_argument("--cuda", type=str, default='0')
-    parser.add_argument('--lr', type=float, default=0.000001)
+    parser.add_argument('--lr', type=float, default=0.00005)
     parser.add_argument('--epoch', type=int, default=30)
     parser.add_argument('--class_num', type=int, default=6) # action:6, people:8
     parser.add_argument('--task', type=str, default="action") # "action" or "people"
@@ -334,13 +334,13 @@ def main():
 
     # train_data, test_data = load_data(args.data_path, train_prop=0.9)
     if args.task=="action":
-        domain_data, test_data1 = load_zero_shot(test_people_list=args.test_list, data_path=args.data_path)
-    elif args.task=="people":
         domain_data, test_data1 = load_zero_shot(test_action_list=args.test_list, data_path=args.data_path)
+    elif args.task=="people":
+        domain_data, test_data1 = load_zero_shot(test_people_list=args.test_list, data_path=args.data_path)
     else:
         print("ERROR")
         exit(-1)
-    domain_data, test_data2 = train_test_split(domain_data,test_size=0.1)
+    domain_data, test_data2 = train_test_split(domain_data, test_size=0.1, random_state=113)
     test_data = ConcatDataset([test_data1,test_data2])
 
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=True)
