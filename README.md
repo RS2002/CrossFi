@@ -12,11 +12,11 @@
 
 ### 1.1 Dataset
 
-to be published
+Dynamic Part of WiGesture Dataset (to be published)
 
 
 
-### 1.2 Data Pre-process
+### 1.2 Data Process
 
 Each sample has a dimension of 2*t*s, representing the channel, height, and width, respectively.
 
@@ -82,8 +82,3 @@ python few_shot.py --MMD --task <task name> --class_num <class number> --data_pa
 python  cross_class-few_shot.py --task <task name> --class_num <class number> --data_path <data path> --test_list <the zero-shot class> --model_path <pre-train model path> --shot_num <k-shot>
 ```
 
-
-
-### 3. Comparative Experiment
-
-The repository also includes code for the comparative models mentioned in our article. You can find them in the "Comparative Experiment" folder.
