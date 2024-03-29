@@ -22,6 +22,8 @@ Each sample has a dimension of 2*t*s, representing the channel, height, and widt
 
 The 2 channels consist of the amplitude and cosine of phase. `t` is the sample number, and `s` is the subcarrier number.
 
+You can process the data refer to [RS2002/CSI-BERT: Official Repository for The Paper, Finding the Missing Data: A BERT-inspired Approach Against Package Loss in Wireless Sensing (github.com)](https://github.com/RS2002/CSI-BERT).
+
 
 
 ## 2. How to Run
