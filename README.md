@@ -18,7 +18,7 @@ Dynamic Part of WiGesture Dataset (to be published)
 
 ### 1.2 Data Process
 
-Each sample has a dimension of 2*t*s, representing the channel, height, and width, respectively.
+Each sample has a dimension of 2\*t\*s, representing the channel, height, and width, respectively.
 
 The 2 channels consist of the amplitude and cosine of phase. `t` is the sample number, and `s` is the subcarrier number.
 
