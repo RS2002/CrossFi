@@ -12,9 +12,7 @@
 
 ### 1.1 Dataset
 
-Dynamic Part of WiGesture Dataset (to be published)
-
-
+Dynamic Part of [WiGesture Dataset](https://paperswithcode.com/dataset/wigesture)
 
 ### 1.2 Data Process
 
