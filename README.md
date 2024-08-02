@@ -1,6 +1,6 @@
 # CSi-Net
 
-**Article:** CSi-Net: A Siamese Network for Cross-Domain Wi-Fi Sensing (under way)
+**Article:** CrossFi: A Cross Domain Wi-Fi Sensing Framework Based on Siamese Network (under way)
 
 ![](./img/framework.jpg)
 
