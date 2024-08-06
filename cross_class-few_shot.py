@@ -362,6 +362,12 @@ def main():
     acc_epoch=0
     loss_epoch=0
     j=0
+
+    loss, acc = iteration(model, attn_model, weight_model, dann, train_loader, test_loader, loss_func, loss_cls, optim, device,
+                  args.task, class_num, args.hidden_dim, train=False, adversarial=False, alpha=0, MMD=False, batch_size=args.batch_size)
+    log = "Initial Loss {:06f}, Initial Acc {:06f} ".format(loss,acc)
+    print(log)
+
     while True:
         j+=1
 

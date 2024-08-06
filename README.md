@@ -2,9 +2,7 @@
 
 **Article:** CrossFi: A Cross Domain Wi-Fi Sensing Framework Based on Siamese Network (under way)
 
-![](./img/framework.jpg)
-
-
+![](./img/main.png)
 
 
 
@@ -38,9 +36,11 @@ python full_shot.py --MMD --task <task name> --class_num <class number> --data_p
 
 If you do not want to use MK-MMD during training, you can omit this parameter. The same applies to the following sections.
 
-![](./img/Weight-Net.jpg)
+
 
 ### 2.2 One-shot
+
+You can also use the code in few-shot and point the shot number as 1.
 
 #### 2.2.1 Cross Domain
 
@@ -68,7 +68,17 @@ python zero_shot.py --task <task name> --class_num <class number> --data_path <d
 
 ### 2.4 Few-shot
 
-### 2.4.1 Cross Domain
+#### 2.4.1 Cross Domain
+
+**Pre-train**
+
+```shell
+python full_shot.py --MMD --task <task name> --class_num <class number> --data_path <data path> --not_full_shot --test_list <the zero-shot class>
+```
+
+
+
+**Fine-tuine**
 
 ```shell
 python few_shot.py --MMD --task <task name> --class_num <class number> --data_path <data path> --test_list <the zero-shot class> --model_path <pre-train model path> --shot_num <k-shot> --score distance
@@ -76,7 +86,17 @@ python few_shot.py --MMD --task <task name> --class_num <class number> --data_pa
 
 
 
-### 2.4.2 Cross Class
+#### 2.4.2 Cross Class
+
+**Pre-train**
+
+```shell
+python full_shot.py --MMD --task <task name> --class_num <class number> --data_path <data path> --novel_class --test_list <the zero-shot class>
+```
+
+
+
+**Fine-tuine**
 
 ```shell
 python  cross_class-few_shot.py --task <task name> --class_num <class number> --data_path <data path> --test_list <the zero-shot class> --model_path <pre-train model path> --shot_num <k-shot>
