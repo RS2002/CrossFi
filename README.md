@@ -104,7 +104,7 @@ python  cross_class-few_shot.py --task <task name> --class_num <class number> --
 
 
 
-## 3. Reference
+## 3. Citation
 
 ```
 @misc{zhao2024crossficrossdomainwifi,
