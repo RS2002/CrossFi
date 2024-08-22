@@ -1,6 +1,6 @@
 # CSi-Net
 
-**Article:** CrossFi: A Cross Domain Wi-Fi Sensing Framework Based on Siamese Network (under way)
+**Article:** Zijian Zhao, Tingwei Chen, Zhijie Cai, Xiaoyang Li, Hang Li, Qimei Chen, Guangxu Zhu*, "CrossFi: A Cross Domain Wi-Fi Sensing Framework Based on Siamese Network" (under review, IEEE Internet of Things Journal (IOT))
 
 ![](./img/main.png)
 
@@ -100,5 +100,21 @@ python full_shot.py --MMD --task <task name> --class_num <class number> --data_p
 
 ```shell
 python  cross_class-few_shot.py --task <task name> --class_num <class number> --data_path <data path> --test_list <the zero-shot class> --model_path <pre-train model path> --shot_num <k-shot>
+```
+
+
+
+## 3. Reference
+
+```
+@misc{zhao2024crossficrossdomainwifi,
+      title={CrossFi: A Cross Domain Wi-Fi Sensing Framework Based on Siamese Network}, 
+      author={Zijian Zhao and Tingwei Chen and Zhijie Cai and Xiaoyang Li and Hang Li and Qimei Chen and Guangxu Zhu},
+      year={2024},
+      eprint={2408.10919},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2408.10919}, 
+}
 ```
 

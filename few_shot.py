@@ -315,7 +315,7 @@ def main():
     model = model.to(device)
     weight_model = Resnet(output_dims=args.batch_size,channel=1,pretrained=True, norm=args.weight_norm)
     weight_model = weight_model.to(device)
-    attn_model = Attention_Score(args.hidden_dim,args.hidden_dim)
+    attn_model = Attention_Score(args.hidden_dim,args.hidden_dim,method=args.score)
     attn_model = attn_model.to(device)
     dann = DANN(model, args.hidden_dim)
     dann = dann.to(device)
