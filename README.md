@@ -1,4 +1,4 @@
-# CSi-Net
+# CrossFi
 
 **Article:** Zijian Zhao, Tingwei Chen, Zhijie Cai, Xiaoyang Li, Hang Li, Qimei Chen, Guangxu Zhu*, "CrossFi: A Cross Domain Wi-Fi Sensing Framework Based on Siamese Network" (under review, IEEE Internet of Things Journal (IOT))
 
