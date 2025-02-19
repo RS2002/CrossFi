@@ -1,6 +1,6 @@
 # CrossFi
 
-**Article:** Zijian Zhao, Tingwei Chen, Zhijie Cai, Xiaoyang Li, Hang Li, Qimei Chen, Guangxu Zhu*, "CrossFi: A Cross Domain Wi-Fi Sensing Framework Based on Siamese Network" (IEEE Internet of Things Journal (IOT))
+**Article:** Zijian Zhao, Tingwei Chen, Zhijie Cai, Xiaoyang Li, Hang Li, Qimei Chen, Guangxu Zhu*, "[CrossFi: A Cross Domain Wi-Fi Sensing Framework Based on Siamese Network](https://ieeexplore.ieee.org/document/10891488)" (IEEE Internet of Things Journal (IOT))
 
 ![](./img/main.png)
 
@@ -107,14 +107,16 @@ python  cross_class-few_shot.py --task <task name> --class_num <class number> --
 ## 3. Citation
 
 ```
-@misc{zhao2024crossficrossdomainwifi,
-      title={CrossFi: A Cross Domain Wi-Fi Sensing Framework Based on Siamese Network}, 
-      author={Zijian Zhao and Tingwei Chen and Zhijie Cai and Xiaoyang Li and Hang Li and Qimei Chen and Guangxu Zhu},
-      year={2024},
-      eprint={2408.10919},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV},
-      url={https://arxiv.org/abs/2408.10919}, 
-}
+@ARTICLE{10891488,
+  author={Zhao, Zijian and Chen, Tingwei and Cai, Zhijie and Li, Xiaoyang and Li, Hang and Chen, Qimei and Zhu, Guangxu},
+  journal={IEEE Internet of Things Journal}, 
+  title={CrossFi: A Cross Domain Wi-Fi Sensing Framework Based on Siamese Network}, 
+  year={2025},
+  volume={},
+  number={},
+  pages={1-1},
+  keywords={Siamese Network;Cross-domain Learning;Few-shot Learning;Zero-shot Learning;Wi-Fi Sensing;Channel Statement Information},
+  doi={10.1109/JIOT.2025.3542850}}
+
 ```
 
